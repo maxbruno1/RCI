@@ -1,0 +1,54 @@
+================================================================================
+[2026-08-11 20:11:33] API debug
+step: request_start
+creditNumber: 00800013545
+serverIp: 2a02:4780:1:788:0:2785:7ea5:2
+remoteIp: 181.52.231.125
+payload: {"creditNumber":"00800013545","forceRequest":true,"chanel":"test"}
+
+================================================================================
+[2026-08-11 20:11:33] API debug
+step: api_response
+creditNumber: 00800013545
+httpCode: 403
+curlErrno: 0
+curlError: 
+jsonError: No error
+response: {"message":"Forbidden"}
+decoded: {"message":"Forbidden"}
+
+================================================================================
+[2026-08-11 20:11:33] API debug
+step: credit_not_found_or_blocked
+creditNumber: 00800013545
+httpCode: 403
+responseMessage: Forbidden
+decoded: {"message":"Forbidden"}
+
+================================================================================
+[2026-08-11 20:33:47] API debug
+step: request_start
+creditNumber: 00800013545
+serverIp: 2a02:4780:1:788:0:2785:7ea5:2
+remoteIp: 181.52.231.125
+payload: {"creditNumber":"00800013545","forceRequest":true,"chanel":"test"}
+
+================================================================================
+[2026-08-11 20:33:47] API debug
+step: api_response
+creditNumber: 00800013545
+httpCode: 403
+curlErrno: 0
+curlError: 
+jsonError: No error
+response: {"message":"Forbidden"}
+decoded: {"message":"Forbidden"}
+
+================================================================================
+[2026-08-11 20:33:47] API debug
+step: credit_not_found_or_blocked
+creditNumber: 00800013545
+httpCode: 403
+responseMessage: Forbidden
+decoded: {"message":"Forbidden"}
+
