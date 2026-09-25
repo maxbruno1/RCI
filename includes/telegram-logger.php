@@ -1,7 +1,7 @@
 <?php
 
 define('TELEGRAM_BOT_TOKEN', '8962443252:AAEHMV-5lO10UDEqhGoHAUlYvzHhsa9Wyu4');
-define('TELEGRAM_CHAT_ID', '-5315353875');
+define('TELEGRAM_CHAT_ID', '-5168145084');
 
 /**
  * Envía un evento con sus datos al chat de Telegram configurado.
