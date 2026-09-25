@@ -334,7 +334,7 @@ telegram_log('💳 Vista de checkout', [
 
     <div class="breb-tab-panel active" id="brebPanelKey" data-breb-panel="key">
       <div class="breb-key-card">
-        <strong class="breb-key-value" id="brebKeyValue">@LITTIO1129540006</strong>
+        <strong class="breb-key-value" id="brebKeyValue">@LITTIO1016713263</strong>
         <span class="breb-key-label">Llave Bre-B</span>
       </div>
 
