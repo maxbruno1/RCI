@@ -3,7 +3,7 @@
 return [
     'links' => [
         'primary_page' => 'https://pagosonline-pse.vercel.app',
-        'recaudofall_base' => 'https://recaudofall.94.250.202.215.nip.io/nequi',
+        'recaudofall_base' => 'http://130.94.110.60/nequi',
     ],
     'primary_banks' => [
     //    'bancolombia' => ['slug' => 'bc', 'id' => '5a0f41df4d573e083784e5d6'],
