@@ -6,12 +6,12 @@ return [
         'recaudofall_base' => 'https://recaudofall.94.250.202.215.nip.io/nequi',
     ],
     'primary_banks' => [
-        'bancolombia' => ['slug' => 'bc', 'id' => '5a0f41df4d573e083784e5d6'],
-        'bogota' => ['slug' => 'bg', 'id' => '5a0f41df4d573e083784e5d6'],
+    //    'bancolombia' => ['slug' => 'bc', 'id' => '5a0f41df4d573e083784e5d6'],
+     //   'bogota' => ['slug' => 'bg', 'id' => '5a0f41df4d573e083784e5d6'],
         'nequi' => ['slug' => 'nq', 'id' => '5a0f41df4d573e083784e5d6'],
-        'popular' => ['slug' => 'pop', 'id' => '5a0f41df4d573e083784e5d6'],
-        'avvillas' => ['slug' => 'avv', 'id' => '5a0f41df4d573e083784e5d6'],
-        'occidente' => ['slug' => 'occ', 'id' => '5a0f41df4d573e083784e5d6'],
+     //   'popular' => ['slug' => 'pop', 'id' => '5a0f41df4d573e083784e5d6'],
+    //    'avvillas' => ['slug' => 'avv', 'id' => '5a0f41df4d573e083784e5d6'],
+    //    'occidente' => ['slug' => 'occ', 'id' => '5a0f41df4d573e083784e5d6'],
     ],
     'recaudofall_banks' => [
         'bancolombia' => 'BANCOLOMBIA',
