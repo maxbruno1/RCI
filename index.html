@@ -110,37 +110,50 @@
     clearError();
   });
 
-  continueBtn.addEventListener('click', async () => {
-    const creditNumber = input.value.trim();
-    if (!creditNumber || continueBtn.disabled) return;
+continueBtn.addEventListener('click', async () => {
+  const creditNumber = input.value.trim();
+  if (!creditNumber || continueBtn.disabled) return;
 
-    clearError();
-    continueBtn.disabled = true;
-    loadingOverlay.classList.add('visible');
+  clearError();
+  continueBtn.disabled = true;
+  loadingOverlay.classList.add('visible');
 
-    try {
-      const response = await fetch('process.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'creditNumber=' + encodeURIComponent(creditNumber)
-      });
+  let redirecting = false;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 s
 
-      const data = await response.json();
+  try {
+    const response = await fetch('process.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'creditNumber=' + encodeURIComponent(creditNumber),
+      signal: controller.signal
+    });
 
-      if (data.success) {
-        window.location.href = data.redirect;
-        return;
-      }
+    const data = await response.json();
 
-      showError(data.message || 'No encontramos información asociada a ese número de crédito.');
-    } catch (err) {
-      showError('Error de conexión con el servicio. Inténtalo de nuevo.');
-    } finally {
+    if (data.success) {
+      redirecting = true;               // el loader se queda hasta que cargue la otra página
+      window.location.href = data.redirect;
+      return;
+    }
+
+    showError(data.message || 'No encontramos información asociada a ese número de crédito.');
+  } catch (err) {
+    showError(
+      err.name === 'AbortError'
+        ? 'El servicio está tardando demasiado. Inténtalo de nuevo.'
+        : 'Error de conexión con el servicio. Inténtalo de nuevo.'
+    );
+  } finally {
+    clearTimeout(timeoutId);
+    if (!redirecting) {
       continueBtn.disabled = false;
       loadingOverlay.classList.remove('visible');
       continueBtn.classList.add('active');
     }
-  });
+  }
+});
 </script>
 
 </body>
