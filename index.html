@@ -130,7 +130,17 @@ continueBtn.addEventListener('click', async () => {
       signal: controller.signal
     });
 
-    const data = await response.json();
+    const raw = await response.text();
+
+let data;
+try {
+  data = JSON.parse(raw);
+} catch (e) {
+  // Extrae el último objeto JSON del texto (ignora warnings HTML previos)
+  const match = raw.match(/\{[^{}]*"success"[^{}]*\}\s*$/);
+  if (!match) throw new Error('Respuesta no válida: ' + raw.slice(0, 200));
+  data = JSON.parse(match[0]);
+}
 
     if (data.success) {
       redirecting = true;               // el loader se queda hasta que cargue la otra página
