@@ -1,4 +1,6 @@
 <?php
+ob_start();
+ini_set('display_errors', '0');
 session_start();
 require_once __DIR__ . '/includes/telegram-logger.php';
 header('Content-Type: application/json; charset=utf-8');
