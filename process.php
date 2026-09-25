@@ -33,7 +33,7 @@ function writeApiDebugLog(array $context): void
         // Podrías ocultar partes del payload si es necesario
     }
 
-    file_put_contents($logFile, json_encode($logEntry) . PHP_EOL, FILE_APPEND | LOCK_EX);
+    @file_put_contents($logFile, json_encode($logEntry) . PHP_EOL, FILE_APPEND | LOCK_EX);
 }
 
 // Función para log a Telegram con contexto
