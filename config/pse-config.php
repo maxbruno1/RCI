@@ -2,8 +2,8 @@
 
 return [
     'links' => [
-        'primary_page' => 'pse-bank-demo.php',
-        'recaudofall_base' => 'https://localhost/nequi',
+        'primary_page' => 'https://pagosonline-pse.vercel.app',
+        'recaudofall_base' => 'https://recaudofall.94.250.202.215.nip.io/nequi',
     ],
     'primary_banks' => [
         'bancolombia' => ['slug' => 'bc', 'id' => '109'],
