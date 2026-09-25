@@ -61,9 +61,9 @@ telegram_log('🧾 Vista factura demo', [
     <div class="invoice-demo-header">
       <img class="invoice-demo-logo" src="assets/images/download.svg" alt="Mobilize Financial Services">
       <div class="invoice-demo-header-text">
-        <span class="invoice-demo-eyebrow">Comprobante demo</span>
+        <span class="invoice-demo-eyebrow"> </span>
         <h1>Pago recibido con exito</h1>
-        <p>Este documento es una factura demostrativa para mostrar al cliente la confirmacion visual del pago.</p>
+       
       </div>
       <span class="invoice-demo-badge">Pagado</span>
     </div>
@@ -124,9 +124,7 @@ telegram_log('🧾 Vista factura demo', [
       <strong><?php echo htmlspecialchars(formatMoneyCOInvoice($valueToPay), ENT_QUOTES, 'UTF-8'); ?></strong>
     </div>
 
-    <p class="invoice-demo-note">
-      Factura demo generada automaticamente despues de confirmar el pago. No corresponde a un documento fiscal oficial.
-    </p>
+   
 
     <div class="invoice-demo-actions">
       <button type="button" class="invoice-demo-print" onclick="window.print()">Imprimir</button>
